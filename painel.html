@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Painel do Depósito</title>
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#FFF5E4">
+  <link rel="icon" href="assets/icone.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <div id="faixa"></div>
+  <div id="raiz"><div class="carregando">Carregando…</div></div>
+
+  <dialog id="dlg-recusar">
+    <form method="dialog" id="form-recusar">
+      <h2>Recusar pedido <span id="dlg-num"></span></h2>
+      <p class="sub">O cliente verá o motivo na tela de acompanhamento.</p>
+      <div class="chips" style="margin:14px 0">
+        <label class="chip"><input type="radio" name="m" value="Fora da área de entrega"><span>Fora da área</span></label>
+        <label class="chip"><input type="radio" name="m" value="Sem estoque no momento"><span>Sem estoque</span></label>
+        <label class="chip"><input type="radio" name="m" value="Depósito fechando"><span>Fechando</span></label>
+        <label class="chip"><input type="radio" name="m" value="Não conseguimos confirmar o endereço"><span>Endereço</span></label>
+      </div>
+      <div class="campo"><label for="motivo">Motivo</label><input id="motivo" maxlength="200" required></div>
+      <div class="acoes">
+        <button class="btn btn-primario" value="ok">Recusar</button>
+        <button class="btn btn-secundario" value="cancel" formnovalidate>Voltar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="assets/config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+  <script src="assets/store.js"></script>
+  <script src="assets/icones.js"></script>
+  <script src="assets/painel.js"></script>
+</body>
+</html>
