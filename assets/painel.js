@@ -58,6 +58,13 @@
 
   // ---------- Painel ----------
   async function iniciar() {
+    if (store.whatsapp) {
+      $raiz.innerHTML = `<div class="login"><div class="logo" style="align-items:center;margin-bottom:20px">${I.logo(80)}<span class="logo-nome">Painel do Depósito</span></div>
+        <div class="cartao"><h2>Os pedidos chegam no seu WhatsApp</h2>
+        <p class="sub">O app está no modo WhatsApp: cada pedido chega como mensagem pronta no número ${esc(fone(C.whatsappDeposito))}, com endereço, pagamento e localização. Responda ao cliente por lá.</p>
+        <p class="sub">Para ter este painel com acompanhamento automático, configure o Supabase (veja o README).</p></div></div>`;
+      return;
+    }
     if (!(await store.ehEquipe())) return telaLogin();
     $raiz.innerHTML = `<div class="painel">
       <header class="painel-topo">
@@ -144,6 +151,8 @@
     const pag = p.pagamento === "dinheiro" ? (p.troco_para ? `Dinheiro · levar troco para ${brl(p.troco_para)}` : "Dinheiro · sem troco")
       : p.pagamento === "cartao" ? `Maquininha · ${p.cartao_tipo === "credito" ? "crédito" : "débito"}` : "Pix na entrega";
     const endCompleto = `${p.endereco}, ${p.bairro}, ${C.cidade} - ${C.uf}`;
+    const gps = String(p.referencia || "").match(/q=(-?\d+\.\d+),(-?\d+\.\d+)/);
+    const mapa = gps ? `https://www.google.com/maps/search/?api=1&query=${gps[1]},${gps[2]}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(endCompleto)}`;
     const prox = PROXIMO[p.status];
     const min = Math.round((Date.now() - Date.parse(p.criado_em)) / 60000);
     const tempo = min < 1 ? "agora" : min < 60 ? `há ${min} min` : `às ${hora(p.criado_em)}`;
@@ -151,14 +160,14 @@
       <div class="pedido-cab"><b>#${p.numero}</b><small>${tempo}</small><span class="etiqueta">${p.status === "enviado" ? "NOVO" : STATUS[p.status]}</span></div>
       <p class="qtd">${p.quantidade}× P13 ${p.troca ? "· troca" : "· <span style='color:var(--laranja-texto)'>sem vazio</span>"}</p>
       <p class="end">${esc(p.endereco)} — ${esc(p.bairro)}</p>
-      ${p.referencia ? `<p class="meta">${esc(p.referencia)}</p>` : ""}
+      ${p.referencia ? `<p class="meta">${esc(String(p.referencia).replace(/\s*·?\s*Localização: \S+/, "")) || "Localização por GPS enviada"}</p>` : ""}
       <p class="meta">${esc(p.nome)} · ${esc(fone(p.telefone))}</p>
       <p><b>${esc(pag)}</b> · ${total}</p>
       ${p.motivo ? `<p class="meta">Motivo: ${esc(p.motivo)}</p>` : ""}
       <div class="links">
         <a href="https://wa.me/55${esc(p.telefone)}" target="_blank" rel="noopener">${I.whats} WhatsApp</a>
         <a href="tel:${esc(p.telefone)}">${I.tel} Ligar</a>
-        <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(endCompleto)}" target="_blank" rel="noopener">${I.mapa} Mapa</a>
+        <a href="${mapa}" target="_blank" rel="noopener">${I.mapa} ${gps ? "Mapa (GPS)" : "Mapa"}</a>
       </div>
       ${prox ? `<div class="acoes">
         <button class="btn btn-primario" data-id="${p.id}" data-status="${prox.status}">${prox.rotulo}</button>

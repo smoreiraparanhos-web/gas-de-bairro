@@ -10,7 +10,22 @@ O cliente pede em poucos toques e acompanha o status. O depósito recebe e atual
 
 Não há pagamento online: o cliente escolhe dinheiro (com troco), Pix ou cartão na maquininha, e paga ao entregador.
 
-## Testar agora (modo demonstração)
+## Como os pedidos chegam
+
+O app tem três modos, escolhidos sozinho pelo que está preenchido em `assets/config.js`:
+
+1. **WhatsApp** (`whatsappDeposito` preenchido): o cliente monta o pedido e ele abre pronto no WhatsApp do depósito
+   (quantidade, troca, nome, endereço, bairro, localização GPS, pagamento e total). O cliente só toca em Enviar.
+   Não precisa de banco de dados nem de cadastro. A confirmação e o acompanhamento seguem pela conversa.
+2. **Painel com acompanhamento** (`supabaseUrl` e `supabaseAnonKey` preenchidos): o pedido cai no painel e o cliente acompanha o status na tela. Veja abaixo.
+3. **Demonstração** (nada preenchido): dados só no navegador, com faixa de aviso.
+
+**Preço:** enquanto `precoDeposito` estiver `null`, o app mostra a média do P13 no RS (ANP, out/2026: R$ 117,89)
+com o selo "preço de referência · valor final confirmado na entrega". Coloque o preço do seu depósito em `precoDeposito`.
+
+**Bairros:** a lista vem da Prefeitura de Eldorado do Sul, com a opção "Outro bairro". Remova os bairros onde não entrega.
+
+## Testar no computador (modo demonstração)
 
 Com `supabaseUrl` vazio no `config.js`, o app roda sozinho, guardando os dados só no navegador e mostrando uma faixa de aviso.
 Num computador:

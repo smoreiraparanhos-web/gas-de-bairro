@@ -25,8 +25,10 @@
   const digitos = (s) => String(s || "").replace(/\D/g, "");
   const parseValor = (s) => { const n = Number(String(s || "").replace(/\./g, "").replace(",", ".")); return isFinite(n) && n > 0 ? n : null; };
   const rodape = (html) => { $rodape.innerHTML = html ? `<div class="rodape-fixo"><div>${html}</div></div>` : ""; };
-  const precoAtual = () => st.loja?.preco ?? (store.demo ? C.precoIlustrativo : null);
-  const precoIlustrativo = () => st.loja?.preco == null && store.demo;
+  const precoAtual = () => st.loja?.preco ?? C.precoReferencia ?? null;
+  const precoIlustrativo = () => st.loja?.preco == null; // true = mostrando o preço de referência
+  const mapaLink = (g) => g ? `https://maps.google.com/?q=${g.lat},${g.lng}` : "";
+  const numeroDeposito = () => digitos(C.whatsappDeposito);
   const textoPag = (p) => {
     if (!p) return "";
     if (p.tipo === "dinheiro") return p.troco ? `Dinheiro · troco para ${brl(p.troco)}` : "Dinheiro · sem troco";
@@ -48,7 +50,7 @@
 
     const preco = precoAtual(), loja = st.loja;
     const precoHtml = preco != null
-      ? `<div class="preco">${brl(preco)}</div>${precoIlustrativo() ? `<span class="selo">preço ilustrativo</span>` : ""}`
+      ? `<div class="preco">${brl(preco)}</div>${precoIlustrativo() ? `<span class="selo">preço de referência</span><small class="fonte-preco">${esc(C.precoReferenciaFonte)} · valor final confirmado na entrega</small>` : ""}`
       : `<div class="preco-confirmar">Preço informado pelo depósito</div>`;
 
     let andamento = "";
@@ -101,7 +103,7 @@
       </nav>
       ${C.telefoneDeposito ? `<p class="nota" style="text-align:center">Dúvidas? Depósito: <a href="tel:${digitos(C.telefoneDeposito)}">${esc(C.telefoneDeposito)}</a></p>` : ""}`;
 
-    const total = () => preco != null ? `<div class="total-rodape"><span>Total${precoIlustrativo() ? " (ilustrativo)" : ""}</span><b>${brl(preco * st.qtd)}</b></div>` : "";
+    const total = () => preco != null ? `<div class="total-rodape"><span>Total${precoIlustrativo() ? " estimado" : ""}</span><b>${brl(preco * st.qtd)}</b></div>` : "";
     const desenhaRodape = () => rodape(`${total()}<button class="btn btn-primario" id="pedir" ${loja.aberto ? "" : "disabled"}>Pedir botijão</button>`);
     desenhaRodape();
 
@@ -138,11 +140,16 @@
 
   function telaEndereco(seguir) {
     const e = st.end || {};
-    const bairros = C.bairrosAtendidos || [];
+    const bairros = C.bairros || [];
+    const naLista = bairros.includes(e.bairro);
+    const outro = !!e.bairro && !naLista;
     const campoBairro = bairros.length
-      ? `<select id="bairro" name="bairro" required><option value="">Escolha o bairro</option>${bairros.map((b) => `<option ${b === e.bairro ? "selected" : ""}>${esc(b)}</option>`).join("")}</select>
-         <div class="dica" style="margin-top:6px">Não achou seu bairro? No momento o depósito não entrega aí.</div>`
+      ? `<select id="bairro-sel" aria-label="Bairro"><option value="">Escolha o bairro</option>${bairros.map((b) => `<option ${b === e.bairro ? "selected" : ""}>${esc(b)}</option>`).join("")}
+           ${C.permitirOutroBairro ? `<option value="__outro" ${outro ? "selected" : ""}>Outro bairro…</option>` : ""}</select>
+         <input id="bairro" name="bairro" autocomplete="address-level3" placeholder="Digite o bairro" value="${esc(outro ? e.bairro : "")}" maxlength="80" style="margin-top:10px" ${outro ? "" : "hidden"}>
+         ${C.permitirOutroBairro ? "" : `<div class="dica" style="margin-top:6px">Não achou seu bairro? No momento o depósito não entrega aí.</div>`}`
       : `<input id="bairro" name="bairro" autocomplete="address-level3" value="${esc(e.bairro || "")}" required maxlength="80">`;
+    let geo = e.geo || null;
 
     $app.innerHTML = `${voltar()}
       <div><h1>Endereço de entrega</h1><p class="sub">Fica salvo neste aparelho para o próximo pedido.</p></div>
@@ -153,7 +160,11 @@
           <input id="telefone" name="telefone" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="(51) 9____-____" value="${esc(fone(e.telefone || ""))}" required></div>
         <div class="campo"><label for="endereco">Rua e número</label>
           <input id="endereco" name="endereco" autocomplete="street-address" value="${esc(e.endereco || "")}" required maxlength="160"></div>
-        <div class="campo"><label for="bairro">Bairro</label>${campoBairro}</div>
+        <div class="campo"><label for="${bairros.length ? "bairro-sel" : "bairro"}">Bairro</label>${campoBairro}</div>
+        <div class="campo">
+          <button type="button" class="btn btn-secundario" id="gps">${I.pin} <span id="gps-txt">${geo ? "Localização marcada ✓" : "Usar minha localização"}</span></button>
+          <div class="dica" style="margin-top:6px" id="gps-dica">${geo ? `<a href="${mapaLink(geo)}" target="_blank" rel="noopener">Ver no mapa</a> · ajuda o entregador a achar sua casa` : "Opcional. Ajuda o entregador a achar sua casa."}</div>
+        </div>
         <div class="campo"><label for="referencia">Complemento ou ponto de referência <span class="dica">· opcional</span></label>
           <textarea id="referencia" name="referencia" maxlength="200" placeholder="Ex.: casa de portão verde, ao lado do mercado">${esc(e.referencia || "")}</textarea></div>
       </form>`;
@@ -161,12 +172,30 @@
 
     const tel = document.getElementById("telefone");
     tel.addEventListener("input", () => { tel.value = fone(digitos(tel.value).slice(0, 11)); });
+    const sel = document.getElementById("bairro-sel"), inpBairro = document.getElementById("bairro");
+    if (sel) sel.onchange = () => { inpBairro.hidden = sel.value !== "__outro"; if (!inpBairro.hidden) inpBairro.focus(); };
+    document.getElementById("gps").onclick = () => {
+      const txt = document.getElementById("gps-txt"), dica = document.getElementById("gps-dica");
+      if (!navigator.geolocation) { dica.textContent = "Seu navegador não permite pegar a localização."; return; }
+      txt.textContent = "Buscando localização…";
+      navigator.geolocation.getCurrentPosition((pos) => {
+        geo = { lat: +pos.coords.latitude.toFixed(6), lng: +pos.coords.longitude.toFixed(6) };
+        txt.textContent = "Localização marcada ✓";
+        dica.innerHTML = `<a href="${mapaLink(geo)}" target="_blank" rel="noopener">Ver no mapa</a> · confira se o ponto está na sua casa`;
+      }, () => {
+        txt.textContent = "Usar minha localização";
+        dica.textContent = "Não foi possível pegar a localização. Verifique se o GPS está ligado e se você permitiu o acesso.";
+      }, { enableHighAccuracy: true, timeout: 15000 });
+    };
 
     document.getElementById("form").onsubmit = (ev) => {
       ev.preventDefault();
       const f = ev.target, d = Object.fromEntries(new FormData(f));
       Object.keys(d).forEach((k) => (d[k] = String(d[k]).trim()));
       d.telefone = digitos(d.telefone);
+      if (sel && sel.value !== "__outro") d.bairro = sel.value;
+      d.bairro = d.bairro || "";
+      if (geo) d.geo = geo;
       const erros = {};
       if (d.nome.length < 2) erros.nome = "Informe seu nome.";
       if (d.telefone.length < 10) erros.telefone = "Informe o número com DDD.";
@@ -176,11 +205,11 @@
       const chaves = Object.keys(erros);
       if (chaves.length) {
         chaves.forEach((k) => {
-          const el = document.getElementById(k), c = el.closest(".campo");
+          const el = document.getElementById(k === "bairro" && sel && sel.value !== "__outro" ? "bairro-sel" : k), c = el.closest(".campo");
           c.classList.add("invalido"); el.setAttribute("aria-invalid", "true");
           c.insertAdjacentHTML("beforeend", `<div class="erro">${erros[k]}</div>`);
         });
-        document.getElementById(chaves[0]).focus();
+        f.querySelector("[aria-invalid=true]")?.focus();
         return;
       }
       st.end = d; gravar("gdb_endereco", d);
@@ -268,13 +297,19 @@
         <dt>Endereço</dt><dd>${esc(st.end.endereco)}<br>${esc(st.end.bairro)} · ${esc(C.cidade)}${st.end.referencia ? `<br><span style="font-weight:600">${esc(st.end.referencia)}</span>` : ""}</dd>
         <dt>WhatsApp</dt><dd>${esc(fone(st.end.telefone))}</dd>
         <dt>Pagamento</dt><dd>${esc(textoPag(st.pag))}</dd>
-        ${preco != null ? `<dt class="total">Total${ilustr ? "*" : ""}</dt><dd class="total">${brl(preco * st.qtd)}</dd>` : ""}
+        ${preco != null ? `<dt class="total">Total${ilustr ? " estimado*" : ""}</dt><dd class="total">${brl(preco * st.qtd)}</dd>` : ""}
       </dl></section>
       ${trocoBaixo ? `<div class="aviso aviso-laranja">O troco informado (${brl(st.pag.troco)}) é menor que o total. <a href="#/pagamento">Ajustar</a></div>` : ""}
-      <p class="nota">${preco == null ? "O valor é confirmado pelo depósito. " : ""}${ilustr ? "* Preço ilustrativo do modo demonstração. " : ""}${!st.troca ? "Sem botijão vazio, o vasilhame é cobrado à parte pelo depósito. " : ""}Você paga somente na entrega.</p>
+      <p class="nota">${preco == null ? "O valor é confirmado pelo depósito. " : ""}${ilustr ? `* Preço de referência (${esc(C.precoReferenciaFonte)}). O valor final é confirmado pelo depósito na entrega. ` : ""}${!st.troca ? "Sem botijão vazio, o vasilhame é cobrado à parte pelo depósito. " : ""}Você paga somente na entrega.</p>
       <p class="nota"><a href="#/endereco">Alterar endereço</a> · <a href="#/pagamento">Alterar pagamento</a></p>
       <div id="erro"></div>`;
     rodape(`<button class="btn btn-primario" id="confirmar" ${st.loja.aberto ? "" : "disabled"}>${st.loja.aberto ? "Confirmar pedido" : "Depósito fechado agora"}</button>`);
+
+    if (store.whatsapp) {
+      document.getElementById("confirmar").textContent = "Enviar pedido pelo WhatsApp";
+      document.getElementById("confirmar").onclick = () => { abrirWhatsapp(); ir("#/whatsapp"); };
+      return;
+    }
 
     document.getElementById("confirmar").onclick = async (ev) => {
       if (enviando) return;
@@ -282,7 +317,8 @@
       try {
         const r = await store.criarPedido({
           quantidade: st.qtd, troca: st.troca, nome: st.end.nome, telefone: st.end.telefone,
-          endereco: st.end.endereco, bairro: st.end.bairro, referencia: st.end.referencia,
+          endereco: st.end.endereco, bairro: st.end.bairro,
+          referencia: [String(st.end.referencia || "").slice(0, 150), st.end.geo ? `Localização: ${mapaLink(st.end.geo)}` : ""].filter(Boolean).join(" · "),
           pagamento: st.pag.tipo, troco_para: st.pag.troco ?? null, cartao_tipo: st.pag.cartao ?? null,
         });
         st.ultimo = { id: r.id, numero: r.numero }; gravar("gdb_ultimo_pedido", st.ultimo);
@@ -376,6 +412,43 @@
     if (store.demo) window.addEventListener("storage", carrega, { once: true });
   }
 
+  function mensagemWhatsapp() {
+    const preco = precoAtual(), ref = precoIlustrativo();
+    const e = st.end, l = [
+      "*Pedido de gás · Gás de Bairro*", "",
+      `*${st.qtd}× Botijão P13* ${st.troca ? "(tenho o vazio para troca)" : "(SEM vazio, preciso do vasilhame)"}`, "",
+      `*Nome:* ${e.nome}`,
+      `*Endereço:* ${e.endereco}, ${e.bairro}, ${C.cidade}`,
+    ];
+    if (e.referencia) l.push(`*Referência:* ${e.referencia}`);
+    if (e.geo) l.push(`*Localização:* ${mapaLink(e.geo)}`);
+    l.push(`*Pagamento na entrega:* ${textoPag(st.pag)}`);
+    if (preco != null) l.push(`*Total${ref ? " estimado" : ""}:* ${brl(preco * st.qtd)}${ref ? " (preço de referência, confirmar)" : ""}`);
+    l.push("", "Pode confirmar o pedido e o tempo de entrega?");
+    return l.join("\n");
+  }
+
+  function abrirWhatsapp() {
+    location.href = `https://wa.me/55${numeroDeposito()}?text=${encodeURIComponent(mensagemWhatsapp())}`;
+  }
+
+  function telaWhatsapp() {
+    if (!st.end || !st.pag) return ir("#/");
+    $app.innerHTML = topo(false) + `
+      <div class="status-topo"><div class="status-icone espera">${I.whats.replace('width="18" height="18"', 'width="44" height="44"')}</div>
+        <h1>Falta só tocar em Enviar</h1>
+        <p class="sub">Seu pedido foi escrito no WhatsApp do depósito. Toque em <b>Enviar</b> na conversa para concluir.</p></div>
+      <section class="cartao"><ol class="timeline">
+        <li class="feito"><span class="ponto">${I.check}</span><span class="tl-texto"><b>Pedido montado</b><small>${st.qtd}× P13 · ${esc(textoPag(st.pag))}</small></span><span></span></li>
+        <li class="atual"><span class="ponto"></span><span class="tl-texto"><b>Enviar no WhatsApp</b><small>Toque em Enviar na conversa que abriu</small></span><span></span></li>
+        <li class="pendente"><span class="ponto"></span><span class="tl-texto"><b>Depósito confirma</b><small>A resposta chega pelo WhatsApp</small></span><span></span></li>
+        <li class="pendente"><span class="ponto"></span><span class="tl-texto"><b>Entrega</b><small>Pagamento na hora, com o entregador</small></span><span></span></li>
+      </ol></section>
+      <p class="nota" style="text-align:center">O WhatsApp não abriu? Use o botão abaixo. Número do depósito: <b>${esc(fone(numeroDeposito()))}</b></p>`;
+    rodape(`<button class="btn btn-primario" id="reabrir">Abrir WhatsApp de novo</button><a class="btn btn-texto" href="#/">Voltar ao início</a>`);
+    document.getElementById("reabrir").onclick = abrirWhatsapp;
+  }
+
   function telaErro(e) {
     $app.innerHTML = topo() + `<div class="aviso aviso-vermelho" role="alert">${esc(e?.amigavel ? e.message : "Não foi possível carregar. Verifique sua internet.")}</div>`;
     rodape(`<button class="btn btn-primario" onclick="location.reload()">Tentar de novo</button>`);
@@ -392,6 +465,7 @@
     if (caminho === "/endereco") return telaEndereco(seguir);
     if (caminho === "/pagamento") return telaPagamento(seguir);
     if (caminho === "/confirmar") return telaConfirmar();
+    if (caminho === "/whatsapp") return telaWhatsapp();
     const m = caminho.match(/^\/pedido\/([\w-]+)$/);
     if (m) return telaAcompanhar(m[1]);
     return telaPedido();

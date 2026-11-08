@@ -78,7 +78,7 @@
 
     return {
       demo: true,
-      async getLoja() { await espera(); const l = ler(K_L, { preco: null, aberto: true, aviso: "" }); return l; },
+      async getLoja() { await espera(); const l = ler(K_L, { preco: null, aberto: true, aviso: "" }); return { ...l, preco: l.preco ?? C.precoDeposito ?? null }; },
       async criarPedido(p) {
         await espera();
         const loja = await this.getLoja();
@@ -120,9 +120,18 @@
     };
   }
 
-  const configurado = C.supabaseUrl && C.supabaseAnonKey && window.supabase;
+  // ---------------- WhatsApp (sem banco de dados) ----------------
+  function storeWhatsapp() {
+    return {
+      demo: false, whatsapp: true,
+      async getLoja() { return { preco: C.precoDeposito ?? null, aberto: true, aviso: "" }; },
+    };
+  }
+
+  const comSupabase = C.supabaseUrl && C.supabaseAnonKey && window.supabase;
+  const comWhatsapp = String(C.whatsappDeposito || "").replace(/\D/g, "").length >= 10;
   window.GDB = {
-    store: configurado ? storeSupabase() : storeDemo(),
+    store: comSupabase ? storeSupabase() : comWhatsapp ? storeWhatsapp() : storeDemo(),
     ATIVOS,
     STATUS: {
       enviado: "Aguardando o depósito",
